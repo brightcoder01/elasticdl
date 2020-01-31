@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from model_zoo.census_wide_deep_model.feature_info_util import (
+from feature_info_util import (
     FeatureInfo,
     TransformOp,
 )

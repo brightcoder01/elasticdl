@@ -1,6 +1,6 @@
-import tensorflow as tf 
+import tensorflow as tf
 
-from feature_config import (
+from model_zoo.census_wide_deep_model.feature_config import (
     CATEGORICAL_FEATURE_KEYS,
     FEATURE_GROUPS,
     LABEL_KEY,
@@ -8,7 +8,10 @@ from feature_config import (
     NUMERIC_FEATURE_KEYS,
     TransformOp,
 )
-from keras_process_layer import AddIdOffset, NumericBucket
+from model_zoo.census_wide_deep_model.keras_process_layer import (
+    AddIdOffset,
+    NumericBucket,
+)
 
 
 # Auto generated `Input Layers` from SQLFlow statement
@@ -48,7 +51,7 @@ def transform(inputs, feature_groups):
     deep_embeddings = []
 
     for group_name, feature_group in feature_groups.items():
-        outputs[group_name] = transform
+        outputs[group_name] = transform_group(inputs, feature_group)
 
     return wide_embeddings, deep_embeddings
 
@@ -76,10 +79,12 @@ def wide_deep_model(input_layers, wide_embeddings, deep_embeddings):
     )
 
 
-# The submitter code
+# The code in submitter program
 def custom_model():
     input_layers = get_input_layers(feature_groups=FEATURE_GROUPS)
-    wide_embeddings, deep_embeddings = transform(input_layers, feature_groups=FEATURE_GROUPS)
+    wide_embeddings, deep_embeddings = transform(
+        input_layers, feature_groups=FEATURE_GROUPS
+    )
 
     return wide_deep_model(input_layers, wide_embeddings, deep_embeddings)
 

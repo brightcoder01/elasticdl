@@ -1,12 +1,20 @@
 from collections import namedtuple
 
-FeatureInfo = namedtuple("FeatureInfo", ["name", "op_name", "dtype", "param"])
+FeatureInfo = namedtuple(
+    "FeatureInfo", ["name", "op_name", "dtype", "param"]
+)
+FeatureTransformInfo = namedtuple(
+    "FeatureTransformInfo",
+    ["name", "input_name", "output_name", "op_name", "output_dtype", "param"],
+)
 
 
 class TransformOp(object):
     HASH = "HASH"
     BUCKETIZE = "BUCKETIZE"
     LOOKUP = "LOOKUP"
+    EMBEDDING = "EMBEDDING"
+    GROUP = "GROUP"
 
 
 def get_id_boundaries(feature_group):

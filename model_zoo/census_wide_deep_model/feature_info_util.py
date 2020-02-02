@@ -5,7 +5,7 @@ FeatureInfo = namedtuple(
 )
 FeatureTransformInfo = namedtuple(
     "FeatureTransformInfo",
-    ["name", "input_name", "output_name", "op_name", "output_dtype", "param"],
+    ["name", "input_names", "output_name", "op_name", "output_dtype", "param"],
 )
 
 

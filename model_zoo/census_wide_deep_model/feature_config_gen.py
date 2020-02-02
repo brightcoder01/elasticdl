@@ -51,15 +51,6 @@ CAPITAL_GAIN_BOUNDARIES = [6000, 6500, 7000, 7500, 8000]
 CAPITAL_LOSS_BOUNDARIES = [2000, 2500, 3000, 3500, 4000]
 HOURS_BOUNDARIES = [10, 20, 30, 40, 50, 60]
 
-TRANSFORM_OUTPUT = {
-    "wide_embeddings": ["group1_wide_embedding", "group2_wide_embedding"],
-    "deep_embeddings": [
-        "group1_deep_embedding",
-        "group2_deep_embedding",
-        "group3_deep_embedding",
-    ],
-}
-
 education_hash = FeatureTransformInfo("education_hash", ["education"], "education_hash", TransformOp.HASH, tf.string, 30)
 occupation_hash = FeatureTransformInfo("occupation_hash", ["occupation"], "occupation_hash", TransformOp.HASH, tf.string, 30)
 native_country_hash = FeatureTransformInfo("native_country_hash", "native_country", "native_country_hash", TransformOp.HASH, tf.string, 100)
@@ -86,3 +77,30 @@ group1_embedding_deep = FeatureTransformInfo("group1_embedding_deep", "group1", 
 group2_embedding_deep = FeatureTransformInfo("group2_embedding_deep", "group2", "group2_embedding_deep", TransformOp.EMBEDDING, tf.int32, 8)
 group3_embedding_deep = FeatureTransformInfo("group3_embedding_deep", "group3", "group3_embedding_deep", TransformOp.EMBEDDING, tf.int32, 8)
 
+MODEL_INPUTS = {
+    "wide_embeddings": ["group1_embedding_wide", "group2_embedding_wide"],
+    "deep_embeddings": ["group1_embedding_deep", "group2_embedding_deep", "group3_embedding_deep"]
+}
+
+FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY = [
+    education_hash,
+    occupation_hash,
+    native_country_hash,
+    workclass_lookup,
+    marital_status_lookup,
+    relationship_lookup,
+    race_lookup,
+    sex_lookup,
+    age_bucketize,
+    capital_gain_bucketize,
+    capital_loss_bucketize,
+    hours_per_week_bucketize,
+    group1,
+    group2,
+    group3,
+    group1_embedding_wide,
+    group2_embedding_wide,
+    group1_embedding_deep,
+    group2_embedding_deep,
+    group3_embedding_deep
+]

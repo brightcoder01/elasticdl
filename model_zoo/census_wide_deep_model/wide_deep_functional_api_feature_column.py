@@ -1,16 +1,19 @@
 import tensorflow as tf
 
-from model_zoo.census_wide_deep_model.feature_config import (
-    CATEGORICAL_FEATURE_KEYS,
-    FEATURE_GROUPS,
-    LABEL_KEY,
-    MODEL_INPUTS,
-    NUMERIC_FEATURE_KEYS,
-    TransformOp,
+from model_zoo.census_wide_deep_model.feature_info_util import (
+    FeatureTransformInfo,
+    TransformOp
+)
+from model_zoo.census_wide_deep_model.feature_config_gen import (
+    FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY,
+    MODEL_INPUTS
 )
 from model_zoo.census_wide_deep_model.keras_process_layer import (
     AddIdOffset,
     NumericBucket,
+    CategoryHash,
+    CategoryLookup,
+    Group
 )
 
 
@@ -54,6 +57,22 @@ def transform(inputs, feature_groups):
         outputs[group_name] = transform_group(inputs, feature_group)
 
     return wide_embeddings, deep_embeddings
+
+
+def transform_from_meta(inputs):
+    transformed = inputs.copy()
+    for feature_transform_info in FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY:
+        if feature_transform_info.TransformOp == TransformOp.HASH:
+            transformed[feature_transform_info.output_name] = CategoryHash(feature_transform_info.param)(transformed[feature_transform_info.input_name])
+        elif feature_transform_info.TransformOp == TransformOp.BUCKETIZE:
+            transformed[feature_transform_info.output_name] = NumericBucket(feature_transform_info.param)(transformed[feature_transform_info.input_name])
+        elif feature_transform_info.TransformOp == TransformOp.LOOKUP:
+            transformed[feature_transform_info.output_name] = CategoryLookup(feature_transform_info.param)(transformed[feature_transform_info.input_name])
+        elif feature_transform_info.TransformOp == TransformOp.GROUP:
+            group_inputs = [transformed[name] for name in feature_transform_info.input_name]
+            transformed[feature_transform_info.output_name] = Group(None)(group_inputs)
+
+    return transformed
 
 
 # The model definition in model zoo

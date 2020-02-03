@@ -1,19 +1,20 @@
 import tensorflow as tf
 
-from model_zoo.census_wide_deep_model.feature_info_util import (
-    FeatureTransformInfo,
-    TransformOp
-)
 from model_zoo.census_wide_deep_model.feature_config_gen import (
     FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY,
-    MODEL_INPUTS
+    INPUT_SCHEMAS,
+    TRANSFORM_OUTPUTS
+)
+from model_zoo.census_wide_deep_model.feature_info_util import (
+    FeatureTransformInfo,
+    TransformOp,
 )
 from model_zoo.census_wide_deep_model.keras_process_layer import (
     AddIdOffset,
-    NumericBucket,
     CategoryHash,
     CategoryLookup,
-    Group
+    Group,
+    NumericBucket,
 )
 
 
@@ -58,21 +59,58 @@ def transform(inputs, feature_groups):
 
     return wide_embeddings, deep_embeddings
 
+def get_input_layers_from_meta(input_schemas):
+    input_layers = {}
+
+    for schema_info in input_schemas:
+        input_layers[schema_info.name] = tf.keras.layers.Input(
+                name=schema_info.name, shape=(1,), dtype=schema_info.dtype
+            )
+
+    return input_layers
 
 def transform_from_meta(inputs):
     transformed = inputs.copy()
-    for feature_transform_info in FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY:
-        if feature_transform_info.TransformOp == TransformOp.HASH:
-            transformed[feature_transform_info.output_name] = CategoryHash(feature_transform_info.param)(transformed[feature_transform_info.input_name])
-        elif feature_transform_info.TransformOp == TransformOp.BUCKETIZE:
-            transformed[feature_transform_info.output_name] = NumericBucket(feature_transform_info.param)(transformed[feature_transform_info.input_name])
-        elif feature_transform_info.TransformOp == TransformOp.LOOKUP:
-            transformed[feature_transform_info.output_name] = CategoryLookup(feature_transform_info.param)(transformed[feature_transform_info.input_name])
-        elif feature_transform_info.TransformOp == TransformOp.GROUP:
-            group_inputs = [transformed[name] for name in feature_transform_info.input_name]
-            transformed[feature_transform_info.output_name] = Group(None)(group_inputs)
 
-    return transformed
+    for feature_transform_info in FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY:
+        if feature_transform_info.op_name == TransformOp.HASH:
+            transformed[feature_transform_info.output_name] = CategoryHash(
+                feature_transform_info.param
+            )(transformed[feature_transform_info.input_name])
+        elif feature_transform_info.op_name == TransformOp.BUCKETIZE:
+            transformed[feature_transform_info.output_name] = NumericBucket(
+                feature_transform_info.param
+            )(transformed[feature_transform_info.input_name])
+        elif feature_transform_info.op_name == TransformOp.LOOKUP:
+            transformed[feature_transform_info.output_name] = CategoryLookup(
+                feature_transform_info.param
+            )(transformed[feature_transform_info.input_name])
+        elif feature_transform_info.op_name == TransformOp.GROUP:
+            group_inputs = [
+                transformed[name] for name in feature_transform_info.input_name
+            ]
+            transformed[feature_transform_info.output_name] = Group(None)(
+                group_inputs
+            )
+        elif feature_transform_info.op_name == TransformOp.EMBEDDING:
+            # The num_buckets should be calcualte from the group items
+            group_identity = tf.feature_column.categorical_column_with_identity(
+                feature_transform_info.input_name,
+                num_buckets=1000
+            )
+            group_embedding = tf.feature_column.embedding_column(
+                group_identity,
+                dimension=feature_transform_info.param
+            )
+            transformed[feature_transform_info.output_name] = tf.keras.layers.DenseFeatures(
+                [group_embedding]
+            )(transformed)
+        elif feature_transform_info.op_name == TransformOp.ARRAY:
+            transformed[feature_transform_info.output_name] = [
+                transformed[name] for name in feature_transform_info.input_name
+            ]
+
+    return tuple(transformed[output_name] for output_name in TRANSFORM_OUTPUTS)
 
 
 # The model definition in model zoo
@@ -109,5 +147,11 @@ def custom_model():
 
 
 if __name__ == "__main__":
+    '''
     model = custom_model()
     print(model.summary())
+    '''
+
+    input_layers = get_input_layers_from_meta(INPUT_SCHEMAS)
+    transformed_outputs = transform_from_meta(input_layers)
+    print(transformed_outputs)

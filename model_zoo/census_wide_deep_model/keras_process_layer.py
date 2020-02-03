@@ -73,11 +73,11 @@ class AddIdOffset(tf.keras.layers.Layer):
 
 class Group(tf.keras.layers.Layer):
     def __init__(self, offsets):
-        super(AddIdOffset, self).__init__()
+        super(Group, self).__init__()
         self.offsets = offsets
 
     def call(self, inputs):
-        if self.offset is None:
+        if self.offsets is None:
             return tf.keras.backend.stack(inputs, axis=1)
 
         ids_with_offset = []

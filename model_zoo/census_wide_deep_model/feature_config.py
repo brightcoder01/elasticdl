@@ -1,9 +1,5 @@
 import tensorflow as tf
-
-from feature_info_util import (
-    FeatureInfo,
-    TransformOp,
-)
+from model_zoo.census_wide_deep_model.feature_info_util import FeatureInfo, TransformOp
 
 WORK_CLASS_VOCABULARY = [
     "Private",

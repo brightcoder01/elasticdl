@@ -1,4 +1,5 @@
 import collections
+import itertools
 import math
 
 from tensorflow.python.feature_column import feature_column as fc_old
@@ -185,3 +186,88 @@ class EmbeddingColumn(
     @property
     def embedding_and_ids(self):
         return self._embedding_delegate.embedding_and_ids
+
+
+def grouped_column(categorical_columns):
+    return GroupedColumn(categorical_columns=categorical_columns)
+
+class GroupedColumn(
+    fc_lib.CategoricalColumn,
+    fc_old._CategoricalColumn,
+    collections.namedtuple('GroupedColumn', ('categorical_columns'))):
+
+    def __init__(self, **kwargs):
+        # Calculate the offset tensor
+        total_num_buckets = 0
+        leaf_column_num_buckets = []
+        for categorical_column in self.categorical_columns:
+            leaf_column_num_buckets.append(categorical_column.num_buckets)
+            total_num_buckets += categorical_column.num_buckets
+        self.accumulated_offsets = list(itertools.accumulate([0] + leaf_column_num_buckets[:-1]))
+        self.total_num_buckets = total_num_buckets
+
+    @property
+    def _is_v2_column(self):
+        for categorical_column in self.categorical_columns:
+            if not categorical_column._is_v2_column:
+                return False
+        
+        return True
+
+    @property
+    def name(self):
+        feature_names = []
+        for categorical_column in self.categorical_columns:
+            feature_names.append(categorical_column.name)
+        
+        return '_G_'.join(sorted(feature_names))
+
+    @property
+    def num_buckets(self):
+        return self.total_num_buckets
+
+    def transform_feature(self, transformation_cache, state_manager):
+        feature_tensors = []
+        for categorical_column in self.categorical_columns:
+            ids_and_weights = categorical_column.get_sparse_tensors(transformation_cache, state_manager)
+            feature_tensors.append(ids_and_weights.id_tensor)
+
+        feature_tensors_with_offset = []
+        for index, offset in enumerate(self.accumulated_offsets):
+            feature_tensor = feature_tensors[index]
+            feature_tensor_with_offset = tf.SparseTensor(
+                indices = feature_tensor.indices,
+                values = tf.add(feature_tensor.values, offset),
+                dense_shape = feature_tensor.dense_shape
+            )
+            feature_tensors_with_offset.append(feature_tensor_with_offset)
+
+        return tf.sparse.concat(
+            axis=-1,
+            sp_inputs=feature_tensors_with_offset
+        )
+
+    def get_sparse_tensors(self, transformation_cache, state_manager):
+        return CategoricalColumn.IdWeightPair(
+            transformation_cache.get(self, state_manager), None)
+
+    @property
+    def parents(self):
+        return list(self.categorical_columns)
+
+    @property
+    def parse_example_spec(self):
+        config = {}
+        for categorical_column in self.categorical_columns:
+            config.update(categorical_column.parse_example_spec)
+
+        return config
+
+    def get_config(self):
+        from tensorflow.python.feature_column.serialization import serialize_feature_column  # pylint: disable=g-import-not-at-top
+        config = dict(zip(self._fields, self))
+        config['keys'] = tuple([serialize_feature_column(fc) for fc in self.keys])
+        return config
+
+    @classmethod
+    def from_config(cls, config, custom_objects=None, columns_by_name=None):

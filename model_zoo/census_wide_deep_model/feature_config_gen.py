@@ -162,7 +162,7 @@ group1 = FeatureTransformInfo(
     "group1",
     TransformOp.GROUP,
     None,
-    None,
+    [8, 7, 6, 5],
 )
 group2 = FeatureTransformInfo(
     "group2",
@@ -175,7 +175,7 @@ group2 = FeatureTransformInfo(
     "group2",
     TransformOp.GROUP,
     None,
-    None,
+    [30, 7, 6, 30],
 )
 group3 = FeatureTransformInfo(
     "group3",
@@ -183,7 +183,7 @@ group3 = FeatureTransformInfo(
     "group3",
     TransformOp.GROUP,
     None,
-    None,
+    [6, 2, 5, 100],
 )
 
 group1_embedding_wide = FeatureTransformInfo(
@@ -252,6 +252,7 @@ deep_embeddings = FeatureTransformInfo(
 
 TRANSFORM_OUTPUTS = ["wide_embeddings", "deep_embeddings"]
 
+# Get this execution order by topological sort
 FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY = [
     education_hash,
     occupation_hash,

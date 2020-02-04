@@ -1,3 +1,4 @@
+import itertools
 import tensorflow as tf
 
 from model_zoo.census_wide_deep_model.feature_config_gen import (
@@ -89,6 +90,7 @@ def transform_from_meta(inputs):
             group_inputs = [
                 transformed[name] for name in feature_transform_info.input_name
             ]
+            offsets = list(itertools.accumulate([0] + feature_transform_info.param[:-1]))
             transformed[feature_transform_info.output_name] = Group(None)(
                 group_inputs
             )
@@ -110,8 +112,33 @@ def transform_from_meta(inputs):
                 transformed[name] for name in feature_transform_info.input_name
             ]
 
-    return tuple(transformed[output_name] for output_name in TRANSFORM_OUTPUTS)
+    # return transformed[TRANSFORM_OUTPUTS[0]], transformed[TRANSFORM_OUTPUTS[1]]
+    return transformed["group1_embedding_deep"]
 
+
+def transform_model():
+    input_layers = get_input_layers_from_meta(INPUT_SCHEMAS)
+    # transformed_output = transform_from_meta(input_layers)
+
+    embeddings = transform_from_meta(input_layers)
+
+    return tf.keras.Model(
+        inputs=input_layers,
+        outputs=embeddings
+    )
+    '''
+    wide_embeddings, deep_embeddings = transform_from_meta(input_layers)
+
+    flat_wide_embedding = tf.keras.layers.concatenate(wide_embeddings, axis=-1)
+    flat_deep_embedding = tf.keras.layers.concatenate(deep_embeddings, axis=-1)
+    wide_output = tf.keras.layers.Dense(1)(flat_wide_embedding)
+    deep_output = tf.keras.layers.Dense(1)(flat_deep_embedding)
+
+    return tf.keras.Model(
+        inputs=input_layers,
+        outputs=wide_output + deep_output
+    )
+    '''
 
 # The model definition in model zoo
 def wide_deep_model(input_layers, wide_embeddings, deep_embeddings):
@@ -152,6 +179,11 @@ if __name__ == "__main__":
     print(model.summary())
     '''
 
+    '''
     input_layers = get_input_layers_from_meta(INPUT_SCHEMAS)
     transformed_outputs = transform_from_meta(input_layers)
     print(transformed_outputs)
+    '''
+
+    model = transform_model()
+    print(model.summary())

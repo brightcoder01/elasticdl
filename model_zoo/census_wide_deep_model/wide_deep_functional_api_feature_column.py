@@ -98,34 +98,96 @@ def transform_from_meta(inputs):
             # The num_buckets should be calcualte from the group items
             group_identity = tf.feature_column.categorical_column_with_identity(
                 feature_transform_info.input_name,
-                num_buckets=1000
+                num_buckets=feature_transform_info.param[0]
             )
             group_embedding = tf.feature_column.embedding_column(
                 group_identity,
-                dimension=feature_transform_info.param
+                dimension=feature_transform_info.param[1]
             )
             transformed[feature_transform_info.output_name] = tf.keras.layers.DenseFeatures(
                 [group_embedding]
-            )(transformed)
+            )({
+                feature_transform_info.input_name: transformed[feature_transform_info.input_name]
+            })
         elif feature_transform_info.op_name == TransformOp.ARRAY:
             transformed[feature_transform_info.output_name] = [
                 transformed[name] for name in feature_transform_info.input_name
             ]
 
-    # return transformed[TRANSFORM_OUTPUTS[0]], transformed[TRANSFORM_OUTPUTS[1]]
-    return transformed["group1_embedding_deep"]
+    return tuple([transformed[name] for name in TRANSFORM_OUTPUTS])
+    # return transformed["group1_embedding_deep"]
+    # return transformed["group1"], transformed["group2"], transformed["group1_embedding_wide"]
+
+
+def transform_code_gen(source_inputs):
+    inputs = source_inputs.copy()
+
+    education_hash = CategoryHash(FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY[0].param)(inputs["education"])
+    occupation_hash = CategoryHash(FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY[1].param)(inputs["occupation"])
+    native_country_hash = CategoryHash(FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY[2].param)(inputs["native_country"])
+    workclass_lookup = CategoryLookup(FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY[3].param)(inputs["workclass"])
+    marital_status_lookup = CategoryLookup(FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY[4].param)(inputs["marital_status"])
+    relationship_lookup = CategoryLookup(FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY[5].param)(inputs["relationship"])
+    race_lookup = CategoryLookup(FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY[6].param)(inputs["race"])
+    sex_lookup = CategoryLookup(FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY[7].param)(inputs["sex"])
+    age_bucketize = NumericBucket(FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY[8].param)(inputs["age"])
+    capital_gain_bucketize = NumericBucket(FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY[9].param)(inputs["capital_gain"])
+    capital_loss_bucketize = NumericBucket(FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY[10].param)(inputs["capital_loss"])
+    hours_per_week_bucketize = NumericBucket(FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY[11].param)(inputs["hours_per_week"])
+
+    group1 = Group(FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY[12].param)([workclass_lookup, hours_per_week_bucketize, capital_gain_bucketize, capital_loss_bucketize])
+    group2 = Group(FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY[13].param)([education_hash, marital_status_lookup, relationship_lookup, occupation_hash])
+    group3 = Group(FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY[14].param)([age_bucketize, sex_lookup, race_lookup, native_country_hash])
+
+    inputs["group1"] = group1
+    inputs["group2"] = group2
+    inputs["group3"] = group3
+
+    group1_wide_embedding_column = tf.feature_column.embedding_column(
+        tf.feature_column.categorical_column_with_identity(
+                "group1",
+                num_buckets=1000
+            ),
+        dimension=FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY[15].param)
+    # group1_embedding_wide = tf.keras.layers.DenseFeatures([group1_wide_embedding_column])({"group1": group1})
+    group1_embedding_wide = tf.keras.layers.DenseFeatures([group1_wide_embedding_column])(inputs)
+    inputs["group1_embedding_wide"] = group1_embedding_wide
+
+    group2_deep_embedding_column = tf.feature_column.embedding_column(
+        tf.feature_column.categorical_column_with_identity(
+                "group2",
+                num_buckets=1000
+            ),
+        dimension=FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY[18].param
+    )
+    # group2_embedding_deep = tf.keras.layers.DenseFeatures([group2_deep_embedding_column])({"group2": group2})
+    group2_embedding_deep = tf.keras.layers.DenseFeatures([group2_deep_embedding_column])(inputs)
+
+    return group1_embedding_wide, group2_embedding_deep
 
 
 def transform_model():
     input_layers = get_input_layers_from_meta(INPUT_SCHEMAS)
     # transformed_output = transform_from_meta(input_layers)
 
-    embeddings = transform_from_meta(input_layers)
+    '''
+    wide_embedding, deep_embedding = transform_code_gen(input_layers)
+    return tf.keras.Model(
+        inputs=input_layers,
+        outputs={
+            "wide": wide_embedding,
+            "deep": deep_embedding
+        }
+    )
+    '''
+
+    transformed = transform_from_meta(input_layers)
 
     return tf.keras.Model(
         inputs=input_layers,
-        outputs=embeddings
+        outputs=transformed
     )
+     
     '''
     wide_embeddings, deep_embeddings = transform_from_meta(input_layers)
 

@@ -192,7 +192,7 @@ group1_embedding_wide = FeatureTransformInfo(
     "group1_embedding_wide",
     TransformOp.EMBEDDING,
     tf.int32,
-    1,
+    (300, 1),
 )
 group2_embedding_wide = FeatureTransformInfo(
     "group2_embedding_wide",
@@ -200,7 +200,7 @@ group2_embedding_wide = FeatureTransformInfo(
     "group2_embedding_wide",
     TransformOp.EMBEDDING,
     tf.int32,
-    1,
+    (1000, 1),
 )
 
 group1_embedding_deep = FeatureTransformInfo(
@@ -209,7 +209,7 @@ group1_embedding_deep = FeatureTransformInfo(
     "group1_embedding_deep",
     TransformOp.EMBEDDING,
     tf.int32,
-    8,
+    (300, 8),
 )
 group2_embedding_deep = FeatureTransformInfo(
     "group2_embedding_deep",
@@ -217,7 +217,7 @@ group2_embedding_deep = FeatureTransformInfo(
     "group2_embedding_deep",
     TransformOp.EMBEDDING,
     tf.int32,
-    8,
+    (1000, 8),
 )
 group3_embedding_deep = FeatureTransformInfo(
     "group3_embedding_deep",
@@ -225,7 +225,7 @@ group3_embedding_deep = FeatureTransformInfo(
     "group3_embedding_deep",
     TransformOp.EMBEDDING,
     tf.int32,
-    8,
+    (512, 8),
 )
 
 wide_embeddings = FeatureTransformInfo(

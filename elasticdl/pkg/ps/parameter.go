@@ -1,11 +1,17 @@
 package ps
 
-import "elasticdl.org/elasticdl/pkg/common"
+import (
+	"elasticdl.org/elasticdl/pkg/common"
+	"elasticdl.org/elasticdl/pkg/proto"
+	"fmt"
+)
 
 // Parameter contains non-embedding param and embedding param
 type Parameter struct {
 	NonEmbeddingParam map[string]*common.Tensor
 	EmbeddingParam    map[string]*common.EmbeddingTable
+	Version           int32
+	InitStatus        bool
 }
 
 // NewParameter creates a parameter instance
@@ -41,4 +47,30 @@ func (p *Parameter) SetEmbeddingParamInfo(name string, dim int64,
 	t := common.NewEmbeddingTable(name, dim, initializer)
 	p.EmbeddingParam[name] = t
 	return t
+}
+
+// InitFromModelPB inits a Parameter instance from model PB to Parameter
+func (p *Parameter) InitFromModelPB(pb *proto.Model) error {
+	for _, v := range pb.EmbeddingTableInfo {
+		p.SetEmbeddingParamInfo(v.Name, v.Dim, v.Initializer)
+	}
+	for _, v := range pb.Param {
+		t := common.DeserializeTensorPB(v)
+		if t.Indices == nil {
+			p.NonEmbeddingParam[t.Name] = t
+		} else {
+			table := p.GetEmbeddingParam(t.Name)
+			if table == nil {
+				return fmt.Errorf("Embedding table %s is not created", t.Name)
+			}
+			err := p.EmbeddingParam[t.Name].SetEmbeddingVectors(t.Indices, t.Value)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	if pb.Version >= 0 {
+		p.Version = pb.Version
+	}
+	return nil
 }

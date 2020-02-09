@@ -1,6 +1,5 @@
 import unittest
 
-import numpy as np
 import tensorflow as tf
 
 from elasticdl.python.elasticdl.feature_column import feature_column
@@ -18,19 +17,22 @@ class GroupedColumnTest(unittest.TestCase):
         )
 
         item_id = tf.feature_column.categorical_column_with_identity(
-            "item_id", num_buckets=128)
-        
-        item_id_user_id_crossed = tf.feature_column.crossed_column([user_id, item_id], hash_bucket_size=200)
+            "item_id", num_buckets=128
+        )
 
-        crossed_indicator = tf.feature_column.indicator_column(item_id_user_id_crossed)
+        item_id_user_id_crossed = tf.feature_column.crossed_column(
+            [user_id, item_id], hash_bucket_size=200
+        )
 
-        output = call_feature_columns([crossed_indicator], 
-        {
-            "user_id": [10, 20],
-            "item_id": [1, 100]
-        })
+        crossed_indicator = tf.feature_column.indicator_column(
+            item_id_user_id_crossed
+        )
 
-        print(output)
+        output = call_feature_columns(
+            [crossed_indicator], {"user_id": [10, 20], "item_id": [1, 100]}
+        )
+
+        # print(output)
         self.assertIsNotNone(output)
 
     def test_call_grouped_column(self):
@@ -39,20 +41,32 @@ class GroupedColumnTest(unittest.TestCase):
         )
 
         item_id = tf.feature_column.categorical_column_with_identity(
-            "item_id", num_buckets=128)
-        
-        item_id_user_id_grouped = feature_column.grouped_column([user_id, item_id])
+            "item_id", num_buckets=128
+        )
 
-        grouped_indicator = tf.feature_column.indicator_column(item_id_user_id_grouped)
-        # grouped_indicator = tf.feature_column.embedding_column(item_id_user_id_grouped, dimension=8)
+        item_id_user_id_concat = feature_column.concat_column(
+            [user_id, item_id]
+        )
 
-        output = call_feature_columns([grouped_indicator], 
-        {
-            "user_id": [10, 20],
-            "item_id": [1, 100]
-        })
+        config = item_id_user_id_concat.get_config()
+        item_id_user_id_concat_clone = feature_column.ConcatColumn.from_config(
+            config
+        )
 
+        self.assertIsNotNone(item_id_user_id_concat_clone)
+
+        grouped_indicator = tf.feature_column.indicator_column(
+            # item_id_user_id_concat
+            item_id_user_id_concat_clone
+        )
+
+        output = call_feature_columns(
+            [grouped_indicator], {"user_id": [10, 20], "item_id": [1, 120]},
+        )
+
+        print(output)
         self.assertIsNotNone(output)
+
 
 if __name__ == "__main__":
     unittest.main()

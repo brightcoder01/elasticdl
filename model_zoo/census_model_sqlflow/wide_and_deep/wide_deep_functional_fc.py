@@ -1,5 +1,3 @@
-import itertools
-
 import tensorflow as tf
 from tensorflow import feature_column as fc
 
@@ -12,13 +10,10 @@ from model_zoo.census_model_sqlflow.feature_configs import (
     capital_gain_bucketize,
     capital_loss_bucketize,
     education_hash,
-    group1,
     group1_embedding_deep,
     group1_embedding_wide,
-    group2,
     group2_embedding_deep,
     group2_embedding_wide,
-    group3,
     group3_embedding_deep,
     hours_per_week_bucketize,
     marital_status_lookup,
@@ -35,8 +30,8 @@ from model_zoo.census_model_sqlflow.feature_info_utils import TransformOp
 # The model definition from model zoo. It's functional style.
 # Input Params:
 #   input_layers: The input layers dict of feature inputs
-#   wide_embeddings: The embedding list for the wide part
-#   deep_embeddings: The embedding list for the deep part
+#   wide_feature_columns: The feature columns for the wide part
+#   deep_feature_columns: The feature columns for the deep part
 def wide_and_deep_classifier(
     input_layers, wide_feature_columns, deep_feature_columns
 ):
@@ -261,7 +256,6 @@ def transform_from_code_gen(source_inputs):
 def custom_model():
     input_layers = get_input_layers(input_schemas=INPUT_SCHEMAS)
     wide_feature_columns, deep_feature_columns = transform(input_layers)
-    # wide_feature_columns, deep_feature_columns = transform_from_code_gen(input_layers)
 
     return wide_and_deep_classifier(
         input_layers, wide_feature_columns, deep_feature_columns

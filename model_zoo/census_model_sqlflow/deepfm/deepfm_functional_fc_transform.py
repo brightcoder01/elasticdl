@@ -1,24 +1,20 @@
-import itertools
-
 import tensorflow as tf
 import tensorflow.keras.backend as K
 from tensorflow import feature_column as fc
 
 from elasticdl.python.elasticdl.feature_column import feature_column as edl_fc
 from model_zoo.census_model_sqlflow.feature_configs import (
+    FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY,
     INPUT_SCHEMAS,
-    LABEL_KEY,
+    TRANSFORM_OUTPUTS,
     age_bucketize,
     capital_gain_bucketize,
     capital_loss_bucketize,
     education_hash,
-    group1,
     group1_embedding_deep,
     group1_embedding_wide,
-    group2,
     group2_embedding_deep,
     group2_embedding_wide,
-    group3,
     group3_embedding_deep,
     hours_per_week_bucketize,
     marital_status_lookup,
@@ -29,18 +25,14 @@ from model_zoo.census_model_sqlflow.feature_configs import (
     sex_lookup,
     workclass_lookup,
 )
-from model_zoo.census_model_sqlflow.keras_process_layers import (
-    Concat,
-    FingerPrint,
-    Lookup,
-    NumericBucket,
-)
+from model_zoo.census_model_sqlflow.feature_info_utils import TransformOp
 
 
 # The model definition from model zoo. It's functional style.
 # Input Params:
 #   input_layers: The input layers dict of feature inputs
-#   input_tensors: list of integer tensors
+#   wide_feature_columns: The feature columns for the wide part
+#   deep_feature_columns: The feature columns for the deep part
 def deepfm_classifier(
     input_layers, wide_feature_columns, deep_feature_columns
 ):
@@ -107,6 +99,57 @@ def get_input_layers(input_schemas):
         )
 
     return input_layers
+
+
+# Build the transform logic from the metadata in feature_configs.py.
+def transform(inputs):
+    feature_column_dict = {}
+
+    for feature_transform_info in FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY:
+        if feature_transform_info.op_name == TransformOp.HASH:
+            feature_column_dict[
+                feature_transform_info.output_name
+            ] = tf.feature_column.categorical_column_with_hash_bucket(
+                feature_transform_info.input_name,
+                hash_bucket_size=feature_transform_info.param,
+            )
+        elif feature_transform_info.op_name == TransformOp.BUCKETIZE:
+            feature_column_dict[
+                feature_transform_info.output_name
+            ] = tf.feature_column.bucketized_column(
+                fc.numeric_column(feature_transform_info.input_name),
+                boundaries=feature_transform_info.param,
+            )
+        elif feature_transform_info.op_name == TransformOp.LOOKUP:
+            feature_column_dict[
+                feature_transform_info.output_name
+            ] = tf.feature_column.categorical_column_with_vocabulary_list(
+                feature_transform_info.input_name,
+                vocabulary_list=workclass_lookup.param,
+            )
+        elif feature_transform_info.op_name == TransformOp.CONCAT:
+            concat_inputs = [
+                feature_column_dict[name]
+                for name in feature_transform_info.input_name
+            ]
+            concat_column = edl_fc.concat_column(concat_inputs)
+            feature_column_dict[
+                feature_transform_info.output_name
+            ] = concat_column
+        elif feature_transform_info.op_name == TransformOp.EMBEDDING:
+            feature_column_dict[
+                feature_transform_info.output_name
+            ] = tf.feature_column.embedding_column(
+                feature_column_dict[feature_transform_info.input_name],
+                dimension=feature_transform_info.param[1],
+            )
+        elif feature_transform_info.op_name == TransformOp.ARRAY:
+            feature_column_dict[feature_transform_info.output_name] = [
+                feature_column_dict[name]
+                for name in feature_transform_info.input_name
+            ]
+
+    return tuple([feature_column_dict[name] for name in TRANSFORM_OUTPUTS])
 
 
 # It can be generated from the parsed meta in feature_configs using code_gen.
@@ -295,7 +338,9 @@ def custom_model():
         input_layers
     )
 
-    return deepfm_classifier(input_layers, wide_feature_columns, deep_feature_columns)
+    return deepfm_classifier(
+        input_layers, wide_feature_columns, deep_feature_columns
+    )
 
 
 def loss(labels, predictions):
@@ -331,26 +376,6 @@ def learning_rate_scheduler(model_version):
         return 0.0002
     else:
         return 0.0001
-
-
-def dataset_fn(dataset, mode, _):
-    def _parse_data(record):
-        feature_description = {}
-        for schema in INPUT_SCHEMAS:
-            feature_description[schema.name] = tf.io.FixedLenFeature(
-                (1,), schema.dtype
-            )
-        feature_description[LABEL_KEY] = tf.io.FixedLenFeature([], tf.int64)
-
-        print(feature_description)
-        parsed_record = tf.io.parse_single_example(record, feature_description)
-        label = parsed_record.pop(LABEL_KEY)
-
-        return parsed_record, label
-
-    dataset = dataset.map(_parse_data)
-
-    return dataset
 
 
 if __name__ == "__main__":

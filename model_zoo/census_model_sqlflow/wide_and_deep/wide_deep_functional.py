@@ -3,7 +3,7 @@ import itertools
 import tensorflow as tf
 from tensorflow import feature_column as fc
 
-from model_zoo.census_model_sqlflow.wide_and_deep.feature_configs import (
+from model_zoo.census_model_sqlflow.feature_configs import (
     FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY,
     INPUT_SCHEMAS,
     TRANSFORM_OUTPUTS,
@@ -28,13 +28,11 @@ from model_zoo.census_model_sqlflow.wide_and_deep.feature_configs import (
     sex_lookup,
     workclass_lookup,
 )
-from model_zoo.census_model_sqlflow.wide_and_deep.feature_info_utils import (
-    TransformOp,
-)
-from model_zoo.census_model_sqlflow.wide_and_deep.keras_process_layers import (
-    CategoryHash,
-    CategoryLookup,
+from model_zoo.census_model_sqlflow.feature_info_utils import TransformOp
+from model_zoo.census_model_sqlflow.keras_process_layers import (
+    FingerPrint,
     Group,
+    Lookup,
     NumericBucket,
 )
 
@@ -84,7 +82,7 @@ def transform(inputs):
 
     for feature_transform_info in FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY:
         if feature_transform_info.op_name == TransformOp.HASH:
-            transformed[feature_transform_info.output_name] = CategoryHash(
+            transformed[feature_transform_info.output_name] = FingerPrint(
                 feature_transform_info.param
             )(transformed[feature_transform_info.input_name])
         elif feature_transform_info.op_name == TransformOp.BUCKETIZE:
@@ -92,10 +90,10 @@ def transform(inputs):
                 feature_transform_info.param
             )(transformed[feature_transform_info.input_name])
         elif feature_transform_info.op_name == TransformOp.LOOKUP:
-            transformed[feature_transform_info.output_name] = CategoryLookup(
+            transformed[feature_transform_info.output_name] = Lookup(
                 feature_transform_info.param
             )(transformed[feature_transform_info.input_name])
-        elif feature_transform_info.op_name == TransformOp.GROUP:
+        elif feature_transform_info.op_name == TransformOp.CONCAT:
             group_inputs = [
                 transformed[name] for name in feature_transform_info.input_name
             ]
@@ -136,26 +134,22 @@ def transform(inputs):
 def transform_from_code_gen(source_inputs):
     inputs = source_inputs.copy()
 
-    education_hash_out = CategoryHash(education_hash.param)(
-        inputs["education"]
-    )
-    occupation_hash_out = CategoryHash(occupation_hash.param)(
+    education_hash_out = FingerPrint(education_hash.param)(inputs["education"])
+    occupation_hash_out = FingerPrint(occupation_hash.param)(
         inputs["occupation"]
     )
-    native_country_hash_out = CategoryHash(native_country_hash.param)(
+    native_country_hash_out = FingerPrint(native_country_hash.param)(
         inputs["native_country"]
     )
-    workclass_lookup_out = CategoryLookup(workclass_lookup.param)(
-        inputs["workclass"]
-    )
-    marital_status_lookup_out = CategoryLookup(marital_status_lookup.param)(
+    workclass_lookup_out = Lookup(workclass_lookup.param)(inputs["workclass"])
+    marital_status_lookup_out = Lookup(marital_status_lookup.param)(
         inputs["marital_status"]
     )
-    relationship_lookup_out = CategoryLookup(relationship_lookup.param)(
+    relationship_lookup_out = Lookup(relationship_lookup.param)(
         inputs["relationship"]
     )
-    race_lookup_out = CategoryLookup(race_lookup.param)(inputs["race"])
-    sex_lookup_out = CategoryLookup(sex_lookup.param)(inputs["sex"])
+    race_lookup_out = Lookup(race_lookup.param)(inputs["race"])
+    sex_lookup_out = Lookup(sex_lookup.param)(inputs["sex"])
     age_bucketize_out = NumericBucket(age_bucketize.param)(inputs["age"])
     capital_gain_bucketize_out = NumericBucket(capital_gain_bucketize.param)(
         inputs["capital_gain"]
@@ -298,3 +292,27 @@ def learning_rate_scheduler(model_version):
         return 0.0002
     else:
         return 0.0001
+
+
+if __name__ == "__main__":
+    model = custom_model()
+    print(model.summary())
+
+    output = model.call(
+        {
+            "education": tf.constant(["Bachelors"], tf.string),
+            "occupation": tf.constant(["Tech-support"], tf.string),
+            "native_country": tf.constant(["United-States"], tf.string),
+            "workclass": tf.constant(["Private"], tf.string),
+            "marital_status": tf.constant(["Separated"], tf.string),
+            "relationship": tf.constant(["Husband"], tf.string),
+            "race": tf.constant(["White"], tf.string),
+            "sex": tf.constant(["Female"], tf.string),
+            "age": tf.constant([18], tf.float32),
+            "capital_gain": tf.constant([100.0], tf.float32),
+            "capital_loss": tf.constant([1.0], tf.float32),
+            "hours_per_week": tf.constant([40], tf.float32),
+        }
+    )
+
+    print(output)

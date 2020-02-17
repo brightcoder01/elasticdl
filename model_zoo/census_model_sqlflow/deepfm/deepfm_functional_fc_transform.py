@@ -1,13 +1,13 @@
 import itertools
 
 import tensorflow as tf
+import tensorflow.keras.backend as K
 from tensorflow import feature_column as fc
 
 from elasticdl.python.elasticdl.feature_column import feature_column as edl_fc
 from model_zoo.census_model_sqlflow.feature_configs import (
-    FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY,
     INPUT_SCHEMAS,
-    TRANSFORM_OUTPUTS,
+    LABEL_KEY,
     age_bucketize,
     capital_gain_bucketize,
     capital_loss_bucketize,
@@ -29,17 +29,22 @@ from model_zoo.census_model_sqlflow.feature_configs import (
     sex_lookup,
     workclass_lookup,
 )
-from model_zoo.census_model_sqlflow.feature_info_utils import TransformOp
+from model_zoo.census_model_sqlflow.keras_process_layers import (
+    Concat,
+    FingerPrint,
+    Lookup,
+    NumericBucket,
+)
 
 
 # The model definition from model zoo. It's functional style.
 # Input Params:
 #   input_layers: The input layers dict of feature inputs
-#   wide_embeddings: The embedding list for the wide part
-#   deep_embeddings: The embedding list for the deep part
-def wide_and_deep_classifier(
+#   input_tensors: list of integer tensors
+def deepfm_classifier(
     input_layers, wide_feature_columns, deep_feature_columns
 ):
+    # Wide Part
     wide_embeddings = []
     for wide_feature_column in wide_feature_columns:
         if not isinstance(wide_feature_column, list):
@@ -58,16 +63,29 @@ def wide_and_deep_classifier(
         )
         deep_embeddings.append(deep_embedding)
 
-    # Wide Part
-    wide = tf.keras.layers.Concatenate()(wide_embeddings)  # shape = (None, 3)
+    group_num = len(deep_embeddings)
+    embeddings = tf.concat(deep_embeddings, 1)  # shape = (None, group_num , 8)
+    embeddings = tf.reshape(embeddings, shape=(-1, group_num, 8))
+    emb_sum = K.sum(embeddings, axis=1)  # shape = (None, 8)
+    emb_sum_square = K.square(emb_sum)  # shape = (None, 8)
+    emb_square = K.square(embeddings)  # shape = (None, group_num, 8)
+    emb_square_sum = K.sum(emb_square, axis=1)  # shape = (None, 8)
+    second_order = 0.5 * tf.keras.layers.Subtract()(
+        [emb_sum_square, emb_square_sum]
+    )
+
+    first_order = tf.keras.layers.Concatenate()(wide_embeddings)
 
     # Deep Part
-    dnn_input = tf.reshape(deep_embeddings, shape=(-1, 3 * 8))
+    dnn_input = tf.keras.layers.Concatenate()(deep_embeddings)
     for i in [16, 8, 4]:
         dnn_input = tf.keras.layers.Dense(i)(dnn_input)
 
     # Output Part
-    concat_input = tf.concat([wide, dnn_input], 1)
+    print(first_order)
+    print(second_order)
+    print(dnn_input)
+    concat_input = tf.concat([first_order, second_order, dnn_input], 1)
 
     logits = tf.reduce_sum(concat_input, 1, keepdims=True)
     probs = tf.reshape(tf.sigmoid(logits), shape=(-1,))
@@ -75,7 +93,7 @@ def wide_and_deep_classifier(
     return tf.keras.Model(
         inputs=input_layers,
         outputs={"logits": logits, "probs": probs},
-        name="wide_deep",
+        name="deepfm",
     )
 
 
@@ -91,55 +109,68 @@ def get_input_layers(input_schemas):
     return input_layers
 
 
-# Build the transform logic from the metadata in feature_configs.py.
-def transform(inputs):
-    feature_column_dict = {}
+# It can be generated from the parsed meta in feature_configs using code_gen.
+def transform(source_inputs):
+    inputs = source_inputs.copy()
 
-    for feature_transform_info in FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY:
-        if feature_transform_info.op_name == TransformOp.HASH:
-            feature_column_dict[
-                feature_transform_info.output_name
-            ] = tf.feature_column.categorical_column_with_hash_bucket(
-                feature_transform_info.input_name,
-                hash_bucket_size=feature_transform_info.param,
-            )
-        elif feature_transform_info.op_name == TransformOp.BUCKETIZE:
-            feature_column_dict[
-                feature_transform_info.output_name
-            ] = tf.feature_column.bucketized_column(
-                fc.numeric_column(feature_transform_info.input_name),
-                boundaries=feature_transform_info.param,
-            )
-        elif feature_transform_info.op_name == TransformOp.LOOKUP:
-            feature_column_dict[
-                feature_transform_info.output_name
-            ] = tf.feature_column.categorical_column_with_vocabulary_list(
-                feature_transform_info.input_name,
-                vocabulary_list=workclass_lookup.param,
-            )
-        elif feature_transform_info.op_name == TransformOp.CONCAT:
-            concat_inputs = [
-                feature_column_dict[name]
-                for name in feature_transform_info.input_name
-            ]
-            concat_column = edl_fc.concat_column(concat_inputs)
-            feature_column_dict[
-                feature_transform_info.output_name
-            ] = concat_column
-        elif feature_transform_info.op_name == TransformOp.EMBEDDING:
-            feature_column_dict[
-                feature_transform_info.output_name
-            ] = tf.feature_column.embedding_column(
-                feature_column_dict[feature_transform_info.input_name],
-                dimension=feature_transform_info.param[1],
-            )
-        elif feature_transform_info.op_name == TransformOp.ARRAY:
-            feature_column_dict[feature_transform_info.output_name] = [
-                feature_column_dict[name]
-                for name in feature_transform_info.input_name
-            ]
+    education_hash_out = FingerPrint(education_hash.param)(inputs["education"])
+    occupation_hash_out = FingerPrint(occupation_hash.param)(
+        inputs["occupation"]
+    )
+    native_country_hash_out = FingerPrint(native_country_hash.param)(
+        inputs["native_country"]
+    )
+    workclass_lookup_out = Lookup(workclass_lookup.param)(inputs["workclass"])
+    marital_status_lookup_out = Lookup(marital_status_lookup.param)(
+        inputs["marital_status"]
+    )
+    relationship_lookup_out = Lookup(relationship_lookup.param)(
+        inputs["relationship"]
+    )
+    race_lookup_out = Lookup(race_lookup.param)(inputs["race"])
+    sex_lookup_out = Lookup(sex_lookup.param)(inputs["sex"])
+    age_bucketize_out = NumericBucket(age_bucketize.param)(inputs["age"])
+    capital_gain_bucketize_out = NumericBucket(capital_gain_bucketize.param)(
+        inputs["capital_gain"]
+    )
+    capital_loss_bucketize_out = NumericBucket(capital_loss_bucketize.param)(
+        inputs["capital_loss"]
+    )
+    hours_per_week_bucketize_out = NumericBucket(
+        hours_per_week_bucketize.param
+    )(inputs["hours_per_week"])
 
-    return tuple([feature_column_dict[name] for name in TRANSFORM_OUTPUTS])
+    group1_offsets = list(itertools.accumulate([0] + group1.param[:-1]))
+    group1_out = Concat(group1_offsets)(
+        [
+            workclass_lookup_out,
+            hours_per_week_bucketize_out,
+            capital_gain_bucketize_out,
+            capital_loss_bucketize_out,
+        ]
+    )
+    group2_offsets = list(itertools.accumulate([0] + group2.param[:-1]))
+    group2_out = Concat(group2_offsets)(
+        [
+            education_hash_out,
+            marital_status_lookup_out,
+            relationship_lookup_out,
+            occupation_hash_out,
+        ]
+    )
+    group3_offsets = list(itertools.accumulate([0] + group3.param[:-1]))
+    group3_out = Concat(group3_offsets)(
+        [
+            age_bucketize_out,
+            sex_lookup_out,
+            race_lookup_out,
+            native_country_hash_out,
+        ]
+    )
+    group_ids = [group1_out, group2_out, group3_out]
+    group_max_ids = [sum(group1.param), sum(group2.param), sum(group3.param)]
+    print("group_max_ids", group_max_ids)
+    return group_ids, group_max_ids
 
 
 # The following code has the same logic with the `transform` function above.
@@ -260,12 +291,11 @@ def transform_from_code_gen(source_inputs):
 # The entry point of the submitter program
 def custom_model():
     input_layers = get_input_layers(input_schemas=INPUT_SCHEMAS)
-    wide_feature_columns, deep_feature_columns = transform(input_layers)
-    # wide_feature_columns, deep_feature_columns = transform_from_code_gen(input_layers)
-
-    return wide_and_deep_classifier(
-        input_layers, wide_feature_columns, deep_feature_columns
+    wide_feature_columns, deep_feature_columns = transform_from_code_gen(
+        input_layers
     )
+
+    return deepfm_classifier(input_layers, wide_feature_columns, deep_feature_columns)
 
 
 def loss(labels, predictions):
@@ -301,6 +331,26 @@ def learning_rate_scheduler(model_version):
         return 0.0002
     else:
         return 0.0001
+
+
+def dataset_fn(dataset, mode, _):
+    def _parse_data(record):
+        feature_description = {}
+        for schema in INPUT_SCHEMAS:
+            feature_description[schema.name] = tf.io.FixedLenFeature(
+                (1,), schema.dtype
+            )
+        feature_description[LABEL_KEY] = tf.io.FixedLenFeature([], tf.int64)
+
+        print(feature_description)
+        parsed_record = tf.io.parse_single_example(record, feature_description)
+        label = parsed_record.pop(LABEL_KEY)
+
+        return parsed_record, label
+
+    dataset = dataset.map(_parse_data)
+
+    return dataset
 
 
 if __name__ == "__main__":

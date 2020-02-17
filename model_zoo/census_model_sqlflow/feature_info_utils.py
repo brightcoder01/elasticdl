@@ -12,5 +12,5 @@ class TransformOp(object):
     BUCKETIZE = "BUCKETIZE"
     LOOKUP = "LOOKUP"
     EMBEDDING = "EMBEDDING"
-    GROUP = "GROUP"
+    CONCAT = "CONCAT"
     ARRAY = "ARRAY"

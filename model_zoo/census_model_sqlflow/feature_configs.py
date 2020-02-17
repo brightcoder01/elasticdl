@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from model_zoo.census_model_sqlflow.wide_and_deep.feature_info_utils import (
+from model_zoo.census_model_sqlflow.feature_info_utils import (
     FeatureTransformInfo,
     SchemaInfo,
     TransformOp,
@@ -162,7 +162,7 @@ group1 = FeatureTransformInfo(
         "capital_loss_bucketize",
     ],
     "group1",
-    TransformOp.GROUP,
+    TransformOp.CONCAT,
     None,
     [8, 7, 6, 5],
 )
@@ -175,7 +175,7 @@ group2 = FeatureTransformInfo(
         "occupation_hash",
     ],
     "group2",
-    TransformOp.GROUP,
+    TransformOp.CONCAT,
     None,
     [30, 7, 6, 30],
 )
@@ -183,7 +183,7 @@ group3 = FeatureTransformInfo(
     "group3",
     ["age_bucketize", "sex_lookup", "race_lookup", "native_country_hash"],
     "group3",
-    TransformOp.GROUP,
+    TransformOp.CONCAT,
     None,
     [6, 2, 5, 100],
 )
@@ -298,3 +298,5 @@ INPUT_SCHEMAS = [
     SchemaInfo("capital_loss", tf.float32),
     SchemaInfo("hours_per_week", tf.float32),
 ]
+
+LABEL_KEY = "label"

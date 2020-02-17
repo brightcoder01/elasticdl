@@ -153,67 +153,54 @@ def transform(inputs):
 
 
 # It can be generated from the parsed meta in feature_configs using code_gen.
-def transform(source_inputs):
-    inputs = source_inputs.copy()
+def transform(inputs):
+    feature_column_dict = {}
 
-    education_hash_out = FingerPrint(education_hash.param)(inputs["education"])
-    occupation_hash_out = FingerPrint(occupation_hash.param)(
-        inputs["occupation"]
-    )
-    native_country_hash_out = FingerPrint(native_country_hash.param)(
-        inputs["native_country"]
-    )
-    workclass_lookup_out = Lookup(workclass_lookup.param)(inputs["workclass"])
-    marital_status_lookup_out = Lookup(marital_status_lookup.param)(
-        inputs["marital_status"]
-    )
-    relationship_lookup_out = Lookup(relationship_lookup.param)(
-        inputs["relationship"]
-    )
-    race_lookup_out = Lookup(race_lookup.param)(inputs["race"])
-    sex_lookup_out = Lookup(sex_lookup.param)(inputs["sex"])
-    age_bucketize_out = NumericBucket(age_bucketize.param)(inputs["age"])
-    capital_gain_bucketize_out = NumericBucket(capital_gain_bucketize.param)(
-        inputs["capital_gain"]
-    )
-    capital_loss_bucketize_out = NumericBucket(capital_loss_bucketize.param)(
-        inputs["capital_loss"]
-    )
-    hours_per_week_bucketize_out = NumericBucket(
-        hours_per_week_bucketize.param
-    )(inputs["hours_per_week"])
+    for feature_transform_info in FEATURE_TRANSFORM_INFO_EXECUTE_ARRAY:
+        if feature_transform_info.op_name == TransformOp.HASH:
+            feature_column_dict[
+                feature_transform_info.output_name
+            ] = tf.feature_column.categorical_column_with_hash_bucket(
+                feature_transform_info.input_name,
+                hash_bucket_size=feature_transform_info.param,
+            )
+        elif feature_transform_info.op_name == TransformOp.BUCKETIZE:
+            feature_column_dict[
+                feature_transform_info.output_name
+            ] = tf.feature_column.bucketized_column(
+                fc.numeric_column(feature_transform_info.input_name),
+                boundaries=feature_transform_info.param,
+            )
+        elif feature_transform_info.op_name == TransformOp.LOOKUP:
+            feature_column_dict[
+                feature_transform_info.output_name
+            ] = tf.feature_column.categorical_column_with_vocabulary_list(
+                feature_transform_info.input_name,
+                vocabulary_list=workclass_lookup.param,
+            )
+        elif feature_transform_info.op_name == TransformOp.CONCAT:
+            concat_inputs = [
+                feature_column_dict[name]
+                for name in feature_transform_info.input_name
+            ]
+            concat_column = edl_fc.concat_column(concat_inputs)
+            feature_column_dict[
+                feature_transform_info.output_name
+            ] = concat_column
+        elif feature_transform_info.op_name == TransformOp.EMBEDDING:
+            feature_column_dict[
+                feature_transform_info.output_name
+            ] = tf.feature_column.embedding_column(
+                feature_column_dict[feature_transform_info.input_name],
+                dimension=feature_transform_info.param[1],
+            )
+        elif feature_transform_info.op_name == TransformOp.ARRAY:
+            feature_column_dict[feature_transform_info.output_name] = [
+                feature_column_dict[name]
+                for name in feature_transform_info.input_name
+            ]
 
-    group1_offsets = list(itertools.accumulate([0] + group1.param[:-1]))
-    group1_out = Concat(group1_offsets)(
-        [
-            workclass_lookup_out,
-            hours_per_week_bucketize_out,
-            capital_gain_bucketize_out,
-            capital_loss_bucketize_out,
-        ]
-    )
-    group2_offsets = list(itertools.accumulate([0] + group2.param[:-1]))
-    group2_out = Concat(group2_offsets)(
-        [
-            education_hash_out,
-            marital_status_lookup_out,
-            relationship_lookup_out,
-            occupation_hash_out,
-        ]
-    )
-    group3_offsets = list(itertools.accumulate([0] + group3.param[:-1]))
-    group3_out = Concat(group3_offsets)(
-        [
-            age_bucketize_out,
-            sex_lookup_out,
-            race_lookup_out,
-            native_country_hash_out,
-        ]
-    )
-    group_ids = [group1_out, group2_out, group3_out]
-    group_max_ids = [sum(group1.param), sum(group2.param), sum(group3.param)]
-    print("group_max_ids", group_max_ids)
-    return group_ids, group_max_ids
+    return tuple([feature_column_dict[name] for name in TRANSFORM_OUTPUTS])
 
 
 # The following code has the same logic with the `transform` function above.
@@ -334,7 +321,7 @@ def transform_from_code_gen(source_inputs):
 # The entry point of the submitter program
 def custom_model():
     input_layers = get_input_layers(input_schemas=INPUT_SCHEMAS)
-    wide_feature_columns, deep_feature_columns = transform_from_code_gen(
+    wide_feature_columns, deep_feature_columns = transform(
         input_layers
     )
 

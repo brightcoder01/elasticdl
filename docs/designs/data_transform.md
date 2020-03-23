@@ -216,11 +216,16 @@ SQLFlow will convert the `COLUMN` expression to Python code of data transformati
 
 ### Compile COLUMN expression to transform python code
 
+`TransformOP`
+
 #### Parse COLUMN Expression into AST
 
 #### Combine the AST into a DAG
 
 #### Expand the TransformOP
+
+Let's take `COLUMN Embedding(item_id, dimension=8)` for example.  
+As we know, the SQLFlow statement is intention driven. We tell it to do embedding for the input feature `item_id` directly and don't tell how to map it into an integer id at first. And the latter is required for the model built by native TensorFlow. So we will expand the `Embedding` TransformOp and add the `Hash` to do id conversion. The DAG will be expaneded from `item_id -> Embedding` to `item_id -> Hash -> Embedding`.  
 
 #### Complete the parameters of TransformOP from data analysis
 

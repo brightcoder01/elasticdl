@@ -214,6 +214,20 @@ LABEL label
 
 SQLFlow will convert the `COLUMN` expression to Python code of data transformation. But it requires some parameters which are derived from the data. So next we will do the analysis work.  
 
+### Compile COLUMN expression to transform python code
+
+#### Parse COLUMN Expression into AST
+
+#### Combine the AST into a DAG
+
+#### Expand the TransformOP
+
+#### Complete the parameters of TransformOP from data analysis
+
+#### Complete the parameters of TransformOP from DAG Walkthrough
+
+#### Generate the Transform Python code from the DAG
+
 ### Generate Analysis SQL From SQLFlow Statement
 
 SQLFlow will generate the analysis SQL to calculate the statistical value. For this clause `COLUMN NORMALIZE(capital_gain), STANDARDIZE(age)`, the corresponding analysis SQL is as follows:

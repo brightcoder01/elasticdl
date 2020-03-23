@@ -220,7 +220,11 @@ SQLFlow will convert the `COLUMN` expression to Python code of data transformati
 
 #### Parse COLUMN Expression into AST
 
-#### Combine the AST into a DAG
+![column_to_ast](../images/column_to_ast.png)
+
+#### Convert the AST into a DAG of Transform Flow
+
+![transform_dag](../images/transform_dag.png)
 
 #### Expand the TransformOP
 

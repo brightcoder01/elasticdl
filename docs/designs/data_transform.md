@@ -320,7 +320,53 @@ The model definition in the model zoo is a python function or a python class. It
 
 For functional model，Tensors is a good choice for the bridge. The transform logic for one `COLUMN` expression outputs one tensor, and two expressions output two tensors. So the COLUMN expressions in example SQL output two tensors: `deep_embeddings` and `wide_embeddings`. The python function of the functional model is [`def wide_and_deep_classifier(input_layers, wide_embeddings, deep_embeddings)`](https://github.com/sql-machine-learning/elasticdl/blob/84bf8026565df81521ffdfe55d854428fb1156d4/model_zoo/census_model_sqlflow/wide_and_deep/wide_deep_functional_tensor_interface_keras.py#L47-L66). The names of the output tensors match the names of the input parameters in the function. We will combine the transform code and model definition through parameter binding according to the name.  
 
+```python
+# Generated transform function
+def transform(inputs):
+    education_hash_out = Hashing(124)(
+        ToSparse()(inputs["education"])
+    )
+
+    ...
+
+    return deep_embeddings, wide_embeddings
+```
+
+```python
+# Functional model definition from model zoo
+def wide_and_deep_classifier(inputs, deep_embeddings, wide_embeddings):
+    # Deep Part
+    dnn_input = deep_embedding
+    for i in [16, 8, 4]:
+        dnn_input = tf.keras.layers.Dense(i)(dnn_input)
+
+    # Output Part
+    concat_input = tf.concat([wide_embeddings, dnn_input], 1)
+
+    ...
+
+    return tf.keras.Model(
+        inputs=input_layers,
+        outputs={"logits": logits, "probs": probs},
+        name="wide_deep",
+    )
+```
+
+```python
+def custom_model():
+    input_layers = get_input_layers(input_schemas=INPUT_SCHEMAS)
+
+    wide_embedding, deep_embedding = transform(input_layers)
+
+    return wide_and_deep_classifier(
+        input_layers, wide_embedding, deep_embedding
+    )
+```
+
 For subclass model, please check the [discussion](https://github.com/sql-machine-learning/elasticdl/issues/1867).
+
+```python
+```
 
 ## Further Consideration
 

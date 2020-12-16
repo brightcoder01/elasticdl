@@ -16,8 +16,8 @@ import time
 from abc import abstractmethod
 from functools import wraps
 
-from elasticdl.python.common.constants import HorovodEnv, WorkerEnv
-from elasticdl.python.common.log_utils import default_logger as logger
+from elasticai_api.common.constants import HorovodEnv, WorkerEnv
+from elasticai_api.common.log_utils import default_logger as logger
 
 try:
     if os.getenv("USE_TORCH", None):

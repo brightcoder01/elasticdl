@@ -17,7 +17,7 @@ from unittest.mock import MagicMock, Mock
 import tensorflow as tf
 import torch.optim as optim
 
-from elasticdl.python.allreduce.base_controller import (
+from elasticai_api.common.base_controller import (
     AllReduceController,
     RendevousManager,
 )

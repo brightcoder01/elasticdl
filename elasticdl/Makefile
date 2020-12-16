@@ -5,7 +5,11 @@ CAPI_DIR = elasticdl/go/pkg/kernel/capi
 
 all: python_pb go_pb kernel
 
+
 python_pb: elasticdl/proto/elasticdl.proto
+	$(PYTHON) -m grpc_tools.protoc -I${TF_PATH} -I. \
+	    elasticai_api/proto/elasticai_api.proto \
+		--python_out=. --grpc_python_out=.
 	$(PYTHON) -m grpc_tools.protoc -I${TF_PATH} -I. \
 	    elasticdl/proto/elasticdl.proto --python_out=. --grpc_python_out=.
 
@@ -15,6 +19,7 @@ go_pb: elasticdl/proto/elasticdl.proto
 	protoc -I${TF_PATH} ${TF_PATH}/tensorflow/core/framework/resource_handle.proto --go_out=${GOPATH}/pkg/mod
 	protoc -I${TF_PATH} ${TF_PATH}/tensorflow/core/framework/tensor_shape.proto --go_out=${GOPATH}/pkg/mod
 	protoc -I${TF_PATH} ${TF_PATH}/tensorflow/core/framework/tensor.proto --go_out=${GOPATH}/pkg/mod
+	protoc -I${TF_PATH} -Ielasticai_api/proto elasticai_api/proto/elasticai_api.proto --go_out=plugins=grpc:.
 	protoc -I${TF_PATH} -Ielasticdl/proto elasticdl/proto/elasticdl.proto --go_out=plugins=grpc:.
 
 kernel:

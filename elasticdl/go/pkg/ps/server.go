@@ -22,6 +22,7 @@ import (
 	"path"
 	"sync"
 
+	"elasticdl.org/elasticai_api/pkg/proto"
 	"elasticdl.org/elasticdl/pkg/proto"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/tensorflow/tensorflow/tensorflow/go/core/framework/tensor_go_proto"

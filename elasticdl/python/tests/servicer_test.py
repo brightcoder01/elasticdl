@@ -18,6 +18,7 @@ from unittest.mock import MagicMock, Mock
 
 import tensorflow as tf
 
+from elasticai_api.proto import elasticai_api_pb2
 from elasticdl.proto import elasticdl_pb2
 from elasticdl.python.master.rendezvous_server import HorovodRendezvousServer
 from elasticdl.python.master.servicer import (
@@ -104,7 +105,7 @@ class ServicerTest(unittest.TestCase):
             )
             task_key = (task.shard.name, task.shard.start, task.shard.end)
             tasks[task_key] += 1
-            report = elasticdl_pb2.ReportTaskResultRequest()
+            report = elasticai_api_pb2.ReportTaskResultRequest()
             report.task_id = task.task_id
             if task.shard.start == 0 and tasks[task_key] == 1:
                 # Simulate error reports.
@@ -144,7 +145,7 @@ class ServicerTest(unittest.TestCase):
             self.master.rendezvous_server,
             None,
         )
-        request = elasticdl_pb2.GetCommRankRequest()
+        request = elasticai_api_pb2.GetCommRankRequest()
         request.worker_id = 0
         rank_response = master_servicer.get_comm_rank(request, None)
         self.assertEqual(rank_response.world_size, 2)

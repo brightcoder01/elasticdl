@@ -7,6 +7,21 @@ import "tensorflow/core/framework/tensor.proto";
 package proto;
 option go_package = "elasticdl/go/pkg/proto";
 
+message ReportEvaluationMetricsRequest {
+  map<string, tensorflow.TensorProto> model_outputs = 1;
+  tensorflow.TensorProto labels = 2;
+  int32 worker_id = 3;
+}
+  
+message ReportVersionRequest {
+  int32 model_version = 1;
+}
+
+service Master {
+  rpc report_evaluation_metrics(ReportEvaluationMetricsRequest)
+      returns (google.protobuf.Empty);
+  rpc report_version(ReportVersionRequest) returns (google.protobuf.Empty);
+}
 
 message IndexedSlicesProto {
   tensorflow.TensorProto concat_tensors = 1;

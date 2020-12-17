@@ -19,7 +19,6 @@ go_pb: elasticdl/proto/elasticdl.proto
 	protoc -I${TF_PATH} ${TF_PATH}/tensorflow/core/framework/resource_handle.proto --go_out=${GOPATH}/pkg/mod
 	protoc -I${TF_PATH} ${TF_PATH}/tensorflow/core/framework/tensor_shape.proto --go_out=${GOPATH}/pkg/mod
 	protoc -I${TF_PATH} ${TF_PATH}/tensorflow/core/framework/tensor.proto --go_out=${GOPATH}/pkg/mod
-	protoc -I${TF_PATH} -Ielasticai_api/proto elasticai_api/proto/elasticai_api.proto --go_out=plugins=grpc:.
 	protoc -I${TF_PATH} -Ielasticdl/proto elasticdl/proto/elasticdl.proto --go_out=plugins=grpc:.
 
 kernel:

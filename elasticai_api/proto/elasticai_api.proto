@@ -1,7 +1,6 @@
 syntax = "proto3";
 
 import "google/protobuf/empty.proto";
-import "tensorflow/core/framework/tensor.proto";
 
 package proto;
 
@@ -66,16 +65,6 @@ message ReportTaskResultRequest {
   map<string, int32> exec_counters = 3;
 }
   
-message ReportEvaluationMetricsRequest {
-  map<string, tensorflow.TensorProto> model_outputs = 1;
-  tensorflow.TensorProto labels = 2;
-  int32 worker_id = 3;
-}
-  
-message ReportVersionRequest {
-  int32 model_version = 1;
-}
-  
 message GetCommRankRequest {
   int32 worker_id = 1;
 }
@@ -89,10 +78,7 @@ message GetCommRankResponse {
   
 service Master {
   rpc get_task(GetTaskRequest) returns (Task);
-  rpc report_evaluation_metrics(ReportEvaluationMetricsRequest)
-      returns (google.protobuf.Empty);
   rpc report_task_result(ReportTaskResultRequest)
       returns (google.protobuf.Empty);
-  rpc report_version(ReportVersionRequest) returns (google.protobuf.Empty);
   rpc get_comm_rank(GetCommRankRequest) returns (GetCommRankResponse);
 }

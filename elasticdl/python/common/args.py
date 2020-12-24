@@ -113,9 +113,6 @@ def _build_master_args_parser():
         help="The listening port of master",
     )
     parser.add_argument(
-        "--worker_image", help="Docker image for workers", default=None
-    )
-    parser.add_argument(
         "--prediction_data",
         help="Either the data directory that contains RecordIO files "
         "or an ODPS table name used for prediction.",
@@ -159,14 +156,6 @@ def _check_master_args_validity(args):
         logger.warning(
             "grads_to_wait is set to 1 while using asynchronous SGD."
         )
-    if (
-        args.num_ps_pods == 0
-        and args.distribution_strategy != DistributionStrategy.ALLREDUCE
-    ):
-        logger.warning(
-            "Set the distribution strategy to be AllReduce if ps number is 0."
-        )
-        args.distribution_strategy = DistributionStrategy.ALLREDUCE
 
 
 def parse_master_args(master_args=None):

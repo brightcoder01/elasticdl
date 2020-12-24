@@ -35,18 +35,18 @@ COLUMN_NAMES = [
 CATEGORICAL_FEATURE_KEYS = [
     "workclass",
     "education",
-    "marital-status",
+    "marital_status",
     "occupation",
     "relationship",
     "race",
     "sex",
-    "native-country",
+    "native_country",
 ]
 NUMERIC_FEATURE_KEYS = [
     "age",
-    "capital-gain",
-    "capital-loss",
-    "hours-per-week",
+    "capital_gain",
+    "capital_loss",
+    "hours_per_week",
 ]
 LABEL_KEY = "label"
 

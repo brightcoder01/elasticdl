@@ -12,17 +12,17 @@
 # limitations under the License.
 
 import tensorflow as tf
-
-from elasticai_api.common.data_shard_service import build_data_shard_service
-from elasticai_api.proto import elasticai_api_pb2
-from elasticai_api.tensorflow.recordio_reader import RecordIODataReader
-from model_zoo.census_wide_deep_model.census_common import (
+from census_common import (
     CATEGORICAL_FEATURE_KEYS,
     LABEL_KEY,
     MODEL_DIR,
     NUMERIC_FEATURE_KEYS,
     build_estimator,
 )
+
+from elasticai_api.common.data_shard_service import build_data_shard_service
+from elasticai_api.proto import elasticai_api_pb2
+from elasticai_api.tensorflow.recordio_reader import RecordIODataReader
 
 tf.logging.set_verbosity(tf.logging.INFO)
 
@@ -51,7 +51,7 @@ def get_input_fn(data_dir, train=True):
         return parsed_record, label
 
     def _input_fn():
-        data_reader = RecordIODataReader(data_dir)
+        data_reader = RecordIODataReader(data_dir=data_dir)
 
         def _gen():
             while True:
@@ -89,7 +89,7 @@ class ReportBatchHook(tf.train.SessionRunHook):
 
 # Build train spec and eval spec
 train_spec = tf.estimator.TrainSpec(
-    input_fn=get_input_fn("/data/mnist/train", True),
+    input_fn=get_input_fn("/data/census/train", True),
     hooks=[
         tf.estimator.StepCounterHook(every_n_steps=100),
         tf.estimator.CheckpointSaverHook(
@@ -99,7 +99,7 @@ train_spec = tf.estimator.TrainSpec(
     ],
 )
 eval_spec = tf.estimator.EvalSpec(
-    input_fn=get_input_fn("/data/mnist/train", False)
+    input_fn=get_input_fn("/data/census/train", False)
 )
 
 # Execute train and evaluate

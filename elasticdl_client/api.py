@@ -116,7 +116,7 @@ def push_zoo(args):
 def train(args):
     container_args = [
         "--worker_image",
-        args.image_name,
+        args.worker_image if args.worker_image else args.image_name,
         "--model_zoo",
         args.model_zoo,
         "--cluster_spec",

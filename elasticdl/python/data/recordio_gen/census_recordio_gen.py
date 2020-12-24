@@ -32,36 +32,36 @@ __COLUMN_NAMES = [
     "workclass",
     "fnlwgt",
     "education",
-    "education-num",
-    "marital-status",
+    "education_num",
+    "marital_status",
     "occupation",
     "relationship",
     "race",
     "sex",
-    "capital-gain",
-    "capital-loss",
-    "hours-per-week",
-    "native-country",
+    "capital_gain",
+    "capital_loss",
+    "hours_per_week",
+    "native_country",
     "label",
 ]
 CATEGORICAL_FEATURE_KEYS = [
     "workclass",
     "education",
-    "marital-status",
+    "marital_status",
     "occupation",
     "relationship",
     "race",
     "sex",
-    "native-country",
+    "native_country",
 ]
 NUMERIC_FEATURE_KEYS = [
     "age",
-    "capital-gain",
-    "capital-loss",
-    "hours-per-week",
+    "capital_gain",
+    "capital_loss",
+    "hours_per_week",
 ]
 OPTIONAL_NUMERIC_FEATURE_KEYS = [
-    "education-num",
+    "education_num",
 ]
 LABEL_KEY = "label"
 

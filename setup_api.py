@@ -16,7 +16,7 @@ from setuptools import find_packages, setup
 with open("elasticai_api/requirements.txt") as f:
     required_deps = f.read().splitlines()
 
-tensorflow_require_list = ["tensorflow"]
+tensorflow_require_list = ["tensorflow", "pyrecordio>=0.0.6"]
 pytorch_require_list = ["torch"]
 
 setup(

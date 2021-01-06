@@ -127,6 +127,7 @@ class MasterServicer(
         return res
 
     def report_task_result(self, request, _):
+        logger.info("Report Task Result")
         if self._task_manager.support_fault_tolerance:
             if request.err_message:
                 logger.warning("Worker reported error: " + request.err_message)

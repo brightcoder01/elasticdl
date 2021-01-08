@@ -33,19 +33,27 @@ _TASK_TIMEOUT_THRESHOLD_SECS = 300
 
 
 class _Shard(object):
-    def __init__(self, name, start, end):
+    def __init__(self, name, start, end, indices=None):
         self.name = name
         self.start = start
         self.end = end
+        self.indices = indices
 
 
 class _Task(object):
     """Internal representation of a task"""
 
     def __init__(
-        self, shard_name, start, end, type, model_version=-1, **kwargs
+        self,
+        shard_name,
+        start,
+        end,
+        type,
+        model_version=-1,
+        task_record_indices=None,
+        **kwargs
     ):
-        self.shard = _Shard(shard_name, start, end)
+        self.shard = _Shard(shard_name, start, end, task_record_indices)
         self.type = type
         self.model_version = model_version
         self.extended_config = kwargs
@@ -112,12 +120,15 @@ class TaskManager(object):
 
         self._batch_size = args.minibatch_size
         self._num_epochs = args.num_epochs
+        self._dataset_size = None
+        self._shuffle = False
+        self._shuffle_shards = False
         self.support_fault_tolerance = args.task_fault_tolerance
         self.relaunch_timeout_worker = args.relaunch_timeout_worker
         self._epoch = 0
         self._max_step = args.max_step
         self._completed_steps = 0
-
+        self._num_minibatches_per_task = args.num_minibatches_per_task
         self._records_per_task = (
             args.minibatch_size * args.num_minibatches_per_task
         )
@@ -210,6 +221,53 @@ class TaskManager(object):
             checkpoint_dir_for_init
         )
 
+    def set_training_params(
+        self, batch_size, num_epochs, dataset_size, shuffle, shuffle_shards
+    ):
+        logger.info(
+            "Set training parameters: "
+            "batch_size={}, num_epochs={}, dataset_size={},"
+            "shuffle={}, shuffle_shards={}".format(
+                batch_size, num_epochs, dataset_size, shuffle, shuffle_shards
+            )
+        )
+
+        with self._lock:
+            if not self._training_shards:
+                # The master receives the training params to create shards
+                self._batch_size = batch_size
+                self._shuffle = shuffle
+                self._shuffle_shards = shuffle_shards
+                self._records_per_task = (
+                    batch_size * self._num_minibatches_per_task
+                )
+                self._num_epochs = (
+                    num_epochs if num_epochs > 0 else self._num_epochs
+                )
+                self._dataset_size = (
+                    dataset_size if dataset_size > 0 else self._dataset_size
+                )
+                self._training_shards = self._create_shards_by_dataset_size(
+                    dataset_size
+                )
+                if self._training_shards:
+                    logger.info("Starting epoch %d", self._epoch)
+                    self.create_tasks(elasticai_api_pb2.TRAINING)
+
+    def _create_shards_by_dataset_size(self, dataset_size):
+        shards = []
+        num_shards = dataset_size // self._records_per_task
+        start_idx = 0
+        for shard_id in range(num_shards):
+            shards.append(("", start_idx, self._records_per_task,))
+            start_idx += self._records_per_task
+        # Create a shard with the last records
+        num_records_left = dataset_size % self._records_per_task
+        if num_records_left != 0:
+            shards.append(("", start_idx, num_records_left,))
+        logger.info("Create {} shards".format(len(shards)))
+        return shards
+
     def reset_job_counters(self, task_type):
         """Return record number in specific task_type"""
         self._job_counters[task_type] = JobCounter()
@@ -232,23 +290,31 @@ class TaskManager(object):
         tasks = []
         num_records_before_create = self._job_counters[task_type].total_records
         # Note that a shard may contain records for multiple tasks.
+        if self._shuffle:
+            record_indices = list(range(0, self._dataset_size))
+            random.shuffle(record_indices)
         for (
             shard_name,
-            start_ind_this_shard,
+            start_idx_this_shard,
             num_records_this_shard,
         ) in shards:
-            max_ind_this_shard = start_ind_this_shard + num_records_this_shard
+            max_idx_this_shard = start_idx_this_shard + num_records_this_shard
             self._job_counters[
                 task_type
             ].total_records += num_records_this_shard
-            for start_ind_this_task in range(
-                start_ind_this_shard,
-                max_ind_this_shard,
+            for start_idx_this_task in range(
+                start_idx_this_shard,
+                max_idx_this_shard,
                 self._records_per_task,
             ):
-                end_ind_this_task = min(
-                    start_ind_this_task + self._records_per_task,
-                    max_ind_this_shard,
+                end_idx_this_task = min(
+                    start_idx_this_task + self._records_per_task,
+                    max_idx_this_shard,
+                )
+                task_record_indices = (
+                    record_indices[start_idx_this_task:end_idx_this_task]
+                    if self._shuffle
+                    else None
                 )
 
                 # Note that only records in [start, end) of this task
@@ -257,14 +323,16 @@ class TaskManager(object):
                 tasks.append(
                     _Task(
                         shard_name=shard_name,
-                        start=start_ind_this_task,
-                        end=end_ind_this_task,
+                        start=start_idx_this_task,
+                        end=end_idx_this_task,
                         type=task_type,
                         model_version=model_version,
+                        task_record_indices=task_record_indices,
                     )
                 )
         if task_type == elasticai_api_pb2.TRAINING:
-            random.shuffle(tasks)
+            if self._shuffle_shards:
+                random.shuffle(tasks)
             self._todo.extend(tasks)
         elif task_type == elasticai_api_pb2.EVALUATION:
             self._eval_todo.extend(tasks)
@@ -292,7 +360,7 @@ class TaskManager(object):
             if not self._eval_todo:
                 return -1, None
             self._task_id += 1
-            task = self._eval_todo.pop()
+            task = self._eval_todo.pop(0)
             if self.support_fault_tolerance:
                 self._doing[self._task_id] = (worker_id, task, time.time())
             return self._task_id, task
@@ -311,19 +379,19 @@ class TaskManager(object):
         shards = self._training_shards
         assert shards is not None
 
-        (shard_name, start_ind_this_shard, num_records_this_shard) = next(
+        (shard_name, start_idx_this_shard, num_records_this_shard) = next(
             iter(shards)
         )
-        start_ind_this_task = start_ind_this_shard
-        end_ind_this_task = start_ind_this_shard + min(
+        start_idx_this_task = start_idx_this_shard
+        end_idx_this_task = start_idx_this_shard + min(
             self._records_per_task, num_records_this_shard
         )
 
         # Use the first shard of data to do the SavedModel work
         train_end_callback_task = _Task(
             shard_name=shard_name,
-            start=start_ind_this_task,
-            end=end_ind_this_task,
+            start=start_idx_this_task,
+            end=end_idx_this_task,
             type=elasticai_api_pb2.TRAIN_END_CALLBACK,
         )
 
@@ -361,15 +429,15 @@ class TaskManager(object):
             ):
                 # Start a new epoch
                 self._epoch += 1
-                self.create_tasks(elasticai_api_pb2.TRAINING)
                 logger.info("Starting epoch %d", self._epoch)
+                self.create_tasks(elasticai_api_pb2.TRAINING)
 
             if not self._todo:
                 # No more tasks
                 return -1, None
 
             self._task_id += 1
-            task = self._todo.pop()
+            task = self._todo.pop(0)
             if self.support_fault_tolerance:
                 self._doing[self._task_id] = (worker_id, task, time.time())
 

@@ -103,18 +103,16 @@ class Master(object):
         """
         try:
             while True:
-                if self.task_manager and self.task_manager.finished():
-                    if self.pod_manager:
-                        self.pod_manager.update_status(
-                            PodManagerStatus.FINISHED
-                        )
-                    break
                 if self.pod_manager and self.pod_manager.all_workers_exited:
-                    if self.task_manager:
-                        raise Exception(
-                            "All workers exited but there also are",
+                    if self.task_manager and not self.task_manager.finished():
+                        logger.warning(
+                            "All workers exited but there also are "
                             "unfinished tasks",
                         )
+                    if self.pod_manager.all_workers_failed:
+                        raise RuntimeError("All workers failed")
+                    self.pod_manager.update_status(PodManagerStatus.FINISHED)
+                    break
                 time.sleep(30)
         except KeyboardInterrupt:
             self.logger.warning("Server stopping")
